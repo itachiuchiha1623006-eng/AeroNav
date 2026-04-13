@@ -21,6 +21,13 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
 
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final session = Supabase.instance.client.auth.currentSession;
+      if (session != null) {
+        context.go('/home');
+      }
+    });
+
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),

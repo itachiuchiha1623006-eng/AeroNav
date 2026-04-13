@@ -4,7 +4,7 @@ import '../screens/splash_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/home_screen.dart';
-
+import '../screens/search_screen.dart';
 final appRouter = GoRouter(
   initialLocation: '/splash',
   redirect: (context, state) {
@@ -40,6 +40,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/home',
       builder: (context, state) => const HomeScreen(),
+    ),
+    GoRoute(
+      path: '/search',
+      builder: (context, state) => const SearchScreen(),
     ),
   ],
 );

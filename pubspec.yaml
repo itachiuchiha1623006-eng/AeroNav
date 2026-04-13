@@ -33,6 +33,7 @@ dependencies:
   latlong2: ^0.9.1
   dio: ^5.9.2
   geolocator: ^14.0.2
+  location: ^8.0.1
 
 dev_dependencies:
   flutter_test:
