@@ -1,0 +1,46 @@
+name: aeronav
+description: "AeroNav — Navigate smarter. Breathe better."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Supabase Auth
+  supabase_flutter: ^2.5.6
+
+  # Navigation
+  go_router: ^14.2.7
+
+  # UI & Fonts
+  google_fonts: ^6.2.1
+  cupertino_icons: ^1.0.8
+
+  # State management
+  flutter_riverpod: ^2.5.1
+
+  # Environment variables
+  flutter_dotenv: ^5.1.0
+
+  # Utilities
+  gap: ^3.0.1
+  flutter_map: ^8.2.2
+  latlong2: ^0.9.1
+  dio: ^5.9.2
+  geolocator: ^14.0.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - .env
