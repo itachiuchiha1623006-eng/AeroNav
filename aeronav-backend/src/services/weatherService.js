@@ -27,6 +27,7 @@ class WeatherService {
       const data = response.data;
 
       const weather = {
+        lat, lng,
         windSpeed: data.wind ? data.wind.speed * 3.6 : 0, // convert m/s to km/h
         rainfall: data.rain ? (data.rain['1h'] || 0) : 0,
         humidity: data.main ? data.main.humidity : 50,
@@ -38,8 +39,13 @@ class WeatherService {
     } catch (error) {
       console.error(`Error fetching weather for ${lat},${lng}:`, error.message);
       // Failover default weather
-      return { windSpeed: 5, rainfall: 0, humidity: 50 }; 
+      return { lat, lng, windSpeed: 5, rainfall: 0, humidity: 50 }; 
     }
+  }
+
+  async getWeatherForMultiplePoints(coordsArray) {
+    const promises = coordsArray.map(coord => this.getWeatherForCoords(coord.lat, coord.lng));
+    return Promise.all(promises);
   }
 }
 

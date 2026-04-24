@@ -6,6 +6,11 @@ class AQIService {
   constructor() {
     this.apiKey = process.env.DATAGOVIN_API_KEY;
     this.baseUrl = 'https://api.data.gov.in/resource/3b01bcb8-0b14-4abf-b6f2-c1bfd384ba69';
+    try {
+      this.stationCoords = require('../data/station_coords.json');
+    } catch (e) {
+      this.stationCoords = {};
+    }
   }
 
   async fetchRawStations() {
@@ -29,16 +34,16 @@ class AQIService {
       const stationsData = response.data.records || [];
       
       const parsedStations = stationsData.map(record => {
-        // CPCB payload parsing
-        // Real implementation needs lat/lng resolution, as datagov API sometimes only returns "city" or "station" string
-        // We'd ideally merge this with a static JSON of station Lat/Lngs.
-        // For MVP, we'll mock the lat/lng based on station name or return mock parsing.
+        // Find coordinates for the station using the local JSON file
+        const stationKey = record.station ? `${record.station}, ${record.city}` : record.city;
+        const coords = this.stationCoords[stationKey] || this.stationCoords[`${record.station}, ${record.city} - CPCB`] || this.stationCoords[`${record.station}, ${record.city} - DPCC`] || this.mockLatLng(record.city);
+
         return {
           id: record.id,
           city: record.city,
           station: record.station,
-          lat: record.lat || this.mockLatLng(record.city).lat, 
-          lng: record.lng || this.mockLatLng(record.city).lng,
+          lat: record.lat || coords.lat, 
+          lng: record.lng || coords.lng,
           pollutant: record.pollutant_id.toLowerCase(),
           avg: parseFloat(record.pollutant_avg) || null
         };
@@ -64,6 +69,16 @@ class AQIService {
       console.error('Error fetching CPCB data:', error.message);
       return this.getMockStations();
     }
+  }
+
+  async fetchStationsForBoundingBox(swLat, swLng, neLat, neLng) {
+    const allStations = await this.fetchRawStations();
+    // Filter stations within the bounding box plus a small margin (e.g., 0.5 degrees)
+    const margin = 0.5;
+    return allStations.filter(st => {
+      return st.lat >= (swLat - margin) && st.lat <= (neLat + margin) &&
+             st.lng >= (swLng - margin) && st.lng <= (neLng + margin);
+    });
   }
 
   async calculatePollutantsForPoint(lat, lng) {

@@ -5,9 +5,13 @@ import 'package:latlong2/latlong.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:location/location.dart' as loc;
+import 'package:permission_handler/permission_handler.dart';
+import 'package:flutter_compass/flutter_compass.dart';
 
 import '../services/auth_service.dart';
 import '../services/navigation_service.dart';
+import '../widgets/pulsing_location_marker.dart';
+import '../models/route_step.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -28,12 +32,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _isPickingOnMap = false;
   bool _isNavigating = false;
   StreamSubscription<loc.LocationData>? _locationSubscription;
+  StreamSubscription<CompassEvent>? _compassSubscription;
   double _currentHeading = 0.0;
 
   // Example coordinates for India (Delhi to Agra)
   LatLng _startPoint = const LatLng(28.6139, 77.2090); // New Delhi
+  LatLng? _userLocation;
   LatLng? _endPoint; // Unset until search
   String? _destinationName;
+
+  List<RouteStep> _navigationSteps = [];
+  int _currentStepIndex = 0;
+
+  int? _liveAqi;
+  String? _liveAqiCategory;
+  String? _liveAqiColorHex;
 
   int _currentIndex = 0;
 
@@ -46,6 +59,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void dispose() {
     _locationSubscription?.cancel();
+    _compassSubscription?.cancel();
     super.dispose();
   }
 
@@ -53,8 +67,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     loc.Location location = loc.Location();
 
     bool serviceEnabled;
-    loc.PermissionStatus permissionGranted;
-    loc.LocationData locationData;
 
     // 1. Auto-turn on Location Services
     serviceEnabled = await location.serviceEnabled();
@@ -65,28 +77,114 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       }
     }
 
-    // 2. Request App Permissions
-    permissionGranted = await location.hasPermission();
-    if (permissionGranted == loc.PermissionStatus.denied) {
-      permissionGranted = await location.requestPermission();
-      if (permissionGranted != loc.PermissionStatus.granted) {
-        return;
+    // 2. Request App Permissions using permission_handler
+    final pStatus = await Permission.locationWhenInUse.status;
+    if (pStatus.isDenied) {
+      final result = await Permission.locationWhenInUse.request();
+      if (!result.isGranted) return;
+    } else if (pStatus.isPermanentlyDenied) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Location Required'),
+            content: const Text('AeroNav needs your location to provide pollution-aware routing. Please open settings to grant permission.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(ctx).pop();
+                  openAppSettings();
+                },
+                child: const Text('Open Settings'),
+              ),
+            ],
+          ),
+        );
       }
+      return;
     }
 
-    // 3. Get exact location and center map
-    try {
-      locationData = await location.getLocation();
-      if (mounted) {
+    // 3. Track location and center map
+    _locationSubscription ??= location.onLocationChanged.listen((locData) {
+      if (!mounted) return;
+      if (locData.latitude != null && locData.longitude != null) {
         setState(() {
-          if (locationData.latitude != null && locationData.longitude != null) {
-            _startPoint = LatLng(locationData.latitude!, locationData.longitude!);
-            _mapController.move(_startPoint, 13.0);
+          _userLocation = LatLng(locData.latitude!, locData.longitude!);
+          if (!_isNavigating && _endPoint == null) {
+            _startPoint = _userLocation!;
           }
         });
+        
+        if (_liveAqi == null) {
+          _fetchLiveAqi();
+        }
+
+        if (_isNavigating) {
+          _mapController.move(_userLocation!, 18.0);
+          if (_currentHeading == 0.0 && locData.heading != null) {
+             _mapController.rotate(locData.heading!);
+          }
+        }
+      }
+    });
+
+    _compassSubscription ??= FlutterCompass.events?.listen((event) {
+      if (!mounted) return;
+      if (event.heading != null) {
+        setState(() {
+          _currentHeading = event.heading!;
+        });
+        if (_isNavigating) {
+          _mapController.rotate(_currentHeading);
+          if (_isNavigating && _userLocation != null &&
+              _navigationSteps.isNotEmpty &&
+              _currentStepIndex < _navigationSteps.length) {
+            final Distance distanceLib = const Distance();
+            final int meters = distanceLib.as(LengthUnit.Meter, _userLocation!,
+                _navigationSteps[_currentStepIndex].point).toInt();
+
+            if (meters < 20 &&
+                _currentStepIndex < _navigationSteps.length - 1) {
+              setState(() {
+                _currentStepIndex++;
+              });
+            }
+          }
+        }
+      }});
+
+    try {
+      final initialLoc = await location.getLocation();
+      if (mounted && initialLoc.latitude != null && initialLoc.longitude != null) {
+        setState(() {
+          _userLocation = LatLng(initialLoc.latitude!, initialLoc.longitude!);
+          _startPoint = _userLocation!;
+        });
+        _mapController.move(_userLocation!, 13.0);
       }
     } catch (e) {
       // Ignored
+    }
+  }
+
+  Future<void> _fetchLiveAqi() async {
+    if (_userLocation == null) return;
+    
+    final data = await _navService.getPointAQI(
+      lat: _userLocation!.latitude,
+      lng: _userLocation!.longitude,
+    );
+
+    if (data != null && mounted) {
+      setState(() {
+        _liveAqi = data['aqi'];
+        _liveAqiCategory = data['category'];
+        _liveAqiColorHex = data['color'];
+      });
     }
   }
 
@@ -130,7 +228,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Polyline(
               points: points,
               color: _colorFromHex(colorHex),
-              strokeWidth: 5.0,
+              strokeWidth: 6.0,
+              strokeCap: StrokeCap.round,
+              strokeJoin: StrokeJoin.round,
             )
           );
         }
@@ -148,12 +248,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             CameraFit.bounds(bounds: bounds, padding: const EdgeInsets.all(50.0)),
           );
         }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to load route. Please check your connection or IP configuration.')),
+          );
+          setState(() {
+            _isExploring = true;
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to load route: $e')),
         );
+        setState(() {
+          _isExploring = true;
+        });
       }
     } finally {
       if (mounted) {
@@ -165,18 +277,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _enterNavigationMode() async {
-    loc.Location location = loc.Location();
+    setState(() {
+      _isLoading = true;
+    });
 
-    bool serviceEnabled = await location.serviceEnabled();
-    if (!serviceEnabled) {
-      serviceEnabled = await location.requestService();
-      if (!serviceEnabled) return;
-    }
+    if (_userLocation != null && _endPoint != null) {
+      final navData = await _navService.getNavigationSteps(
+        startLat: _userLocation!.latitude,
+        startLng: _userLocation!.longitude,
+        endLat: _endPoint!.latitude,
+        endLng: _endPoint!.longitude,
+      );
 
-    loc.PermissionStatus permissionGranted = await location.hasPermission();
-    if (permissionGranted == loc.PermissionStatus.denied) {
-      permissionGranted = await location.requestPermission();
-      if (permissionGranted != loc.PermissionStatus.granted) return;
+      if (navData != null) {
+        final summary = navData['summary'] as Map<String, dynamic>;
+        final stepsJson = summary['steps'] as List<dynamic>? ?? [];
+        _navigationSteps = stepsJson.map((s) => RouteStep.fromJson(s)).toList();
+        _currentStepIndex = 0;
+      }
     }
 
     setState(() {
@@ -184,22 +302,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _isLoading = false;
     });
 
-    _locationSubscription = location.onLocationChanged.listen((locData) {
-      if (!mounted) return;
-      if (locData.latitude != null && locData.longitude != null) {
-        setState(() {
-          _startPoint = LatLng(locData.latitude!, locData.longitude!);
-          _currentHeading = locData.heading ?? 0.0;
-        });
-        
-        _mapController.move(_startPoint, 18.0);
-        _mapController.rotate(_currentHeading);
-      }
-    });
+    if (_userLocation != null) {
+      _mapController.move(_userLocation!, 18.0);
+      _mapController.rotate(_currentHeading);
+    }
   }
 
   void _exitNavigationMode() {
-    _locationSubscription?.cancel();
     setState(() {
       _isNavigating = false;
       _isExploring = true;
@@ -207,7 +316,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       _destinationName = null;
       _polylines = [];
       _endPoint = null;
-      _currentHeading = 0.0;
+      _navigationSteps = [];
+      _currentStepIndex = 0;
     });
     _mapController.rotate(0.0);
     _mapController.move(_startPoint, 13.0);
@@ -321,12 +431,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   Text('View all', style: TextStyle(color: Color(0xFF2DB87A), fontWeight: FontWeight.w600)),
                 ],
               ),
-              const SizedBox(height: 16),
-              _buildLocationCard(Icons.home, 'Home', '24 min • Eco-route'),
-              const SizedBox(height: 12),
-              _buildLocationCard(Icons.work, 'Work', '45 min • Traffic light'),
-              const SizedBox(height: 12),
-              _buildLocationCard(Icons.history, 'Recent', 'Central Park West'),
+
               const SizedBox(height: 24),
               _buildAQICard(),
               const SizedBox(height: 100), // padding for bottom nav
@@ -369,34 +474,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildAQICard() {
+    if (_liveAqi == null) return const SizedBox.shrink();
+
+    final Color bgColor = _colorFromHex(_liveAqiColorHex ?? '#009E60');
+    final bool isDark = bgColor.computeLuminance() < 0.5;
+    final Color textColor = isDark ? Colors.white : Colors.black87;
+
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF009E60),
+        color: bgColor,
         borderRadius: BorderRadius.circular(24)
       ),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Air Quality is Great', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
-                SizedBox(height: 4),
-                Text('Today is a perfect day for the scenic route.', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                Text('Air Quality: ${_liveAqiCategory ?? 'Unknown'}', style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 18)),
+                const SizedBox(height: 4),
+                Text('Current live reading at your location.', style: TextStyle(color: textColor.withOpacity(0.8), fontSize: 14)),
               ],
             ),
           ),
           Container(
             padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: Color(0xFF2DB87A),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.white24 : Colors.black12,
               shape: BoxShape.circle
             ),
-            child: const Column(
+            child: Column(
               children: [
-                Text('AQI', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                Text('12', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                Text('AQI', style: TextStyle(color: textColor, fontSize: 10, fontWeight: FontWeight.bold)),
+                Text('$_liveAqi', style: TextStyle(color: textColor, fontSize: 20, fontWeight: FontWeight.bold)),
               ],
             ),
           )
@@ -663,7 +774,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  IconData _getManeuverIcon(String type, String modifier) {
+    if (type == 'arrive') return Icons.flag;
+    if (type == 'depart') return Icons.straight;
+    if (type == 'turn') {
+      if (modifier.contains('left')) return Icons.turn_left;
+      if (modifier.contains('right')) return Icons.turn_right;
+    }
+    return Icons.straight;
+  }
+
   Widget _buildNavigationHeader() {
+    RouteStep? currentStep;
+    int distanceToNext = 0;
+    
+    if (_navigationSteps.isNotEmpty && _currentStepIndex < _navigationSteps.length) {
+      currentStep = _navigationSteps[_currentStepIndex];
+      if (_userLocation != null) {
+        final Distance distanceLib = const Distance();
+        distanceToNext = distanceLib.as(LengthUnit.Meter, _userLocation!, currentStep.point).toInt();
+      }
+    }
+
     return Positioned(
       top: 50,
       left: 16,
@@ -679,16 +811,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         child: Row(
           children: [
-            const Icon(Icons.turn_slight_right, color: Colors.white, size: 32),
+            Icon(
+              currentStep != null ? _getManeuverIcon(currentStep.maneuverType, currentStep.modifier) : Icons.navigation, 
+              color: Colors.white, size: 32
+            ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Follow the route', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                  Text(
+                    currentStep?.instruction ?? 'Follow the route', 
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)
+                  ),
                   const SizedBox(height: 2),
-                  Text('Navigating to ${_destinationName ?? 'Destination'}', style: const TextStyle(fontSize: 13, color: Colors.white70)),
+                  Text(currentStep != null ? 'In $distanceToNext meters' : 'Navigating to ${_destinationName ?? 'Destination'}', style: const TextStyle(fontSize: 13, color: Colors.white70)),
                 ],
               ),
             ),
@@ -703,6 +841,36 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: const Icon(Icons.close, color: Colors.white, size: 20),
               ),
             )
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAQILegend() {
+    return Positioned(
+      top: 140,
+      right: 16,
+      child: Container(
+        width: 14,
+        height: 120,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF7E0023), // Hazardous
+              Color(0xFF8F3F97), // Very Unhealthy
+              Color(0xFFFF0000), // Unhealthy
+              Color(0xFFFF7E00), // Unhealthy for Sensitive Groups
+              Color(0xFFFFFF00), // Moderate
+              Color(0xFF00E400), // Good
+            ],
+            stops: [0.1, 0.3, 0.5, 0.7, 0.9, 1.0],
+          ),
+          boxShadow: const [
+            BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(2, 2))
           ],
         ),
       ),
@@ -737,18 +905,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       point: _startPoint,
                       width: 40,
                       height: 40,
-                      child: _isNavigating 
-                        ? Transform.rotate(
-                            angle: _currentHeading * (3.14159 / 180),
-                            child: const Icon(Icons.navigation, color: Colors.blueAccent, size: 40),
-                          )
-                        : Container(
-                            decoration: BoxDecoration(
-                              color: Colors.blueAccent,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 3)
-                            ),
-                          ),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.blueAccent,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3)
+                        ),
+                      ),
                     ),
                     Marker(
                       point: _endPoint!,
@@ -756,12 +919,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       height: 40,
                       child: Container(
                         decoration: BoxDecoration(
-                          color: _isNavigating ? const Color(0xFF009E60) : Colors.black87,
+                          color: Colors.black87,
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 3)
                         ),
-                        child: Icon(Icons.flag, color: Colors.white, size: _isNavigating ? 16 : 20),
+                        child: const Icon(Icons.flag, color: Colors.white, size: 20),
                       ),
+                    ),
+                  ],
+                ),
+              if (_userLocation != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: _userLocation!,
+                      width: 40,
+                      height: 40,
+                      child: _isNavigating 
+                        ? Transform.rotate(
+                            angle: _currentHeading * (3.14159 / 180),
+                            child: const Icon(Icons.navigation, color: Colors.blueAccent, size: 40),
+                          )
+                        : const PulsingLocationMarker()
                     ),
                   ],
                 ),
@@ -769,6 +948,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
           
           if (_isExploring) _buildSearchBar(),
+          
+          if (_isExploring && _polylines.isNotEmpty) _buildAQILegend(),
           
           if (_isExploring) _buildExploreSheet(),
 
