@@ -165,6 +165,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           _startPoint = _userLocation!;
         });
         _mapController.move(_userLocation!, 13.0);
+        _fetchLiveAqi();
       }
     } catch (e) {
       // Ignored
@@ -174,17 +175,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Future<void> _fetchLiveAqi() async {
     if (_userLocation == null) return;
     
-    final data = await _navService.getPointAQI(
-      lat: _userLocation!.latitude,
-      lng: _userLocation!.longitude,
-    );
+    try {
+      final data = await _navService.getPointAQI(
+        lat: _userLocation!.latitude,
+        lng: _userLocation!.longitude,
+      );
 
-    if (data != null && mounted) {
-      setState(() {
-        _liveAqi = data['aqi'];
-        _liveAqiCategory = data['category'];
-        _liveAqiColorHex = data['color'];
-      });
+      if (data != null && mounted) {
+        setState(() {
+          _liveAqi = data['aqi'];
+          _liveAqiCategory = data['category'];
+          _liveAqiColorHex = data['color'];
+        });
+      } else if (mounted) {
+        // Log to screen if the data fetch failed
+        ScaffoldMessenger.of(context).showSnackBar(
+           const SnackBar(content: Text('Could not fetch AQI. Check API backend or network.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+           SnackBar(content: Text('AQI Error: $e')),
+        );
+      }
     }
   }
 
@@ -335,11 +349,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         return;
       }
       
-      setState(() {
-        _endPoint = LatLng(result['latitude'], result['longitude']);
-        _destinationName = result['name'];
+      final endPt = LatLng(result['latitude'], result['longitude']);
+      context.push('/routes', extra: {
+        'startPoint': _startPoint,
+        'endPoint': endPt,
+        'destinationName': result['name'],
       });
-      _fetchRoute();
     }
   }
 
@@ -401,42 +416,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       minChildSize: 0.1,
       maxChildSize: 0.55,
       builder: (context, scrollController) {
-        return Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-            boxShadow: [
-              BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -2))
-            ]
-          ),
-          child: ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            children: [
-              Center(
-                child: Container(
-                  margin: const EdgeInsets.only(top: 12, bottom: 16),
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[300],
-                    borderRadius: BorderRadius.circular(2)
-                  ),
-                ),
+        // StatefulBuilder ensures this subtree rebuilds when parent calls setState
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+                boxShadow: [
+                  BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -2))
+                ]
               ),
-              const Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: ListView(
+                controller: scrollController,
+                padding: const EdgeInsets.symmetric(horizontal: 24),
                 children: [
-                  Text('Explore nearby', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87)),
-                  Text('View all', style: TextStyle(color: Color(0xFF2DB87A), fontWeight: FontWeight.w600)),
+                  Center(
+                    child: Container(
+                      margin: const EdgeInsets.only(top: 12, bottom: 16),
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(2)
+                      ),
+                    ),
+                  ),
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Explore nearby', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87)),
+                      Text('View all', style: TextStyle(color: Color(0xFF2DB87A), fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+                  _buildAQICard(),
+                  const SizedBox(height: 100), // padding for bottom nav
                 ],
               ),
-
-              const SizedBox(height: 24),
-              _buildAQICard(),
-              const SizedBox(height: 100), // padding for bottom nav
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -474,7 +494,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildAQICard() {
-    if (_liveAqi == null) return const SizedBox.shrink();
+    if (_liveAqi == null) {
+      // Show a loading placeholder while AQI is being fetched
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF0F3F1),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: const Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Air Quality', style: TextStyle(color: Colors.black54, fontWeight: FontWeight.bold, fontSize: 18)),
+                  SizedBox(height: 4),
+                  Text('Fetching live reading...', style: TextStyle(color: Colors.black38, fontSize: 14)),
+                ],
+              ),
+            ),
+            SizedBox(
+              width: 48,
+              height: 48,
+              child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF2DB87A)),
+            ),
+          ],
+        ),
+      );
+    }
 
     final Color bgColor = _colorFromHex(_liveAqiColorHex ?? '#009E60');
     final bool isDark = bgColor.computeLuminance() < 0.5;
@@ -494,7 +542,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               children: [
                 Text('Air Quality: ${_liveAqiCategory ?? 'Unknown'}', style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 18)),
                 const SizedBox(height: 4),
-                Text('Current live reading at your location.', style: TextStyle(color: textColor.withOpacity(0.8), fontSize: 14)),
+                Text('Current live reading at your location.', style: TextStyle(color: textColor.withValues(alpha: 0.8), fontSize: 14)),
               ],
             ),
           ),
@@ -958,13 +1006,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: Card(
                 color: Colors.black87,
                 child: Padding(
-                  padding: EdgeInsets.all(16.0),
+                  padding: EdgeInsets.all(20.0),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       CircularProgressIndicator(color: Color(0xFF2DB87A)),
                       SizedBox(height: 16),
-                      Text('Calculating pollution route...', style: TextStyle(color: Colors.white)),
+                      Text('Calculating pollution route...', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                      SizedBox(height: 6),
+                      Text('This may take up to a minute.\nFetching live AQI & weather data.', style: TextStyle(color: Colors.white60, fontSize: 12), textAlign: TextAlign.center),
                     ],
                   ),
                 ),
@@ -1008,11 +1058,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   onPressed: () {
                     final centerMap = _mapController.camera.center;
                     setState(() {
-                      _endPoint = centerMap;
-                      _destinationName = 'Map Selection';
                       _isPickingOnMap = false;
+                      _isExploring = true;
                     });
-                    _fetchRoute();
+                    context.push('/routes', extra: {
+                      'startPoint': _startPoint,
+                      'endPoint': centerMap,
+                      'destinationName': 'Map Selection',
+                    });
                   },
                   child: const Text('Confirm Destination', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                 ),

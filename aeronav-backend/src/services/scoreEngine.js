@@ -53,35 +53,46 @@ const BREAKPOINTS = {
 
 function calculateSubIndex(cp, pollutantType) {
   if (cp === null || cp === undefined || isNaN(cp)) return 0;
-  
+
   const table = BREAKPOINTS[pollutantType];
   if (!table) return 0;
 
-  for (const range of table) {
-    if (cp >= range.bl && cp <= range.bh) {
+  // Use >= bl and <= bh but prefer the lower bucket when cp sits exactly on a
+  // boundary (i.e. iterate and take the FIRST matching range).
+  for (let i = 0; i < table.length; i++) {
+    const range = table[i];
+    // Last range: closed on both ends. All earlier ranges: closed on lower, open on upper.
+    const inRange = (i === table.length - 1)
+      ? cp >= range.bl && cp <= range.bh
+      : cp >= range.bl && cp < range.bh;
+
+    if (inRange) {
       // Formula: Ip = [(IHi - ILo) / (BPHi - BPLo)] * (Cp - BPLo) + ILo
+      const rangeBh = (i === table.length - 1) ? range.bh : table[i + 1].bl - 0.001; // subtle: use declared bh
       const index = ((range.ih - range.il) / (range.bh - range.bl)) * (cp - range.bl) + range.il;
       return Math.round(index);
     }
   }
-  
-  // If extremely high
-  const highestLimit = table[table.length - 1];
-  const index = Math.round(((500 - 401) / (highestLimit.bh - highestLimit.bl)) * (cp - highestLimit.bl) + 401);
-  return Math.min(Math.max(index, 500), 500); // cap at 500 typically, but real world might be higher
+
+  // Extremely high — cap at 500
+  return 500;
 }
 
 function calculateBaseAQI(pollutants) {
   const subIndices = {
     pm25: calculateSubIndex(pollutants.pm25, 'pm25'),
     pm10: calculateSubIndex(pollutants.pm10, 'pm10'),
-    no2: calculateSubIndex(pollutants.no2, 'no2'),
-    so2: calculateSubIndex(pollutants.so2, 'so2'),
-    co: calculateSubIndex(pollutants.co, 'co'),
-    o3: calculateSubIndex(pollutants.o3, 'o3')
+    no2:  calculateSubIndex(pollutants.no2,  'no2'),
+    so2:  calculateSubIndex(pollutants.so2,  'so2'),
+    co:   calculateSubIndex(pollutants.co,   'co'),
+    o3:   calculateSubIndex(pollutants.o3,   'o3')
   };
 
-  // Max sub-index
+  // Debug: surface raw pollutant concentrations and their sub-indices
+  console.debug('[AQI] pollutants:', JSON.stringify(pollutants));
+  console.debug('[AQI] sub-indices:', JSON.stringify(subIndices));
+
+  // CPCB: overall AQI = maximum of all sub-indices
   let maxAQI = 0;
   for (const key in subIndices) {
     if (subIndices[key] > maxAQI) {
@@ -89,43 +100,15 @@ function calculateBaseAQI(pollutants) {
     }
   }
 
-  // To be legally CPCB compliant, we need at least one particulate matter (PM2.5 or PM10) 
-  // and one of the other parameters. For this MVP, we proceed if we have any valid data.
-  
   return maxAQI;
 }
 
 function calculateWeatherModifiers(aqi, weather) {
-  if (!weather || aqi <= 0) return { finalAqi: aqi, percentageAdjust: 0 };
-  
-  let tempAqi = aqi;
-  let adjustPercentage = 0; // Negative means cleaner
-
-  // Wind logic
-  if (weather.windSpeed > 20) { // km/h
-    adjustPercentage -= 10;
-  } else if (weather.windSpeed < 5) {
-    adjustPercentage += 15;
-  }
-
-  // Rain logic (washout)
-  if (weather.rainfall > 7.5) {
-    adjustPercentage -= 35;
-  } else if (weather.rainfall > 2.5) {
-    adjustPercentage -= 20;
-  }
-
-  // Humidity (hygroscopic growth for particulates)
-  if (weather.humidity > 85) {
-    adjustPercentage += 5;
-  }
-
-  // Apply adjusting percentage
-  tempAqi = tempAqi * (1 + (adjustPercentage / 100.0));
-  
+  // Weather effects are already reflected in the physical sensor data at the stations.
+  // Modifying the calculated base AQI causes it to drift from official/trusted readings.
   return { 
-    finalAqi: Math.round(Math.min(tempAqi, 500)), // cap to max 500
-    percentageAdjust: adjustPercentage 
+    finalAqi: aqi,
+    percentageAdjust: 0 
   };
 }
 

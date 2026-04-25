@@ -5,6 +5,8 @@ import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/search_screen.dart';
+import '../screens/routes_screen.dart';
+import 'package:latlong2/latlong.dart';
 final appRouter = GoRouter(
   initialLocation: '/splash',
   redirect: (context, state) {
@@ -44,6 +46,17 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/search',
       builder: (context, state) => const SearchScreen(),
+    ),
+    GoRoute(
+      path: '/routes',
+      builder: (context, state) {
+        final args = state.extra as Map<String, dynamic>;
+        return RoutesScreen(
+          startPoint: args['startPoint'] as LatLng,
+          endPoint: args['endPoint'] as LatLng,
+          destinationName: args['destinationName'] as String,
+        );
+      },
     ),
   ],
 );

@@ -47,6 +47,6 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: 'Internal Server Error', details: err.message });
 });
 
-app.listen(PORT, () => {
-  logger.info(`Server is listening on port ${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  logger.info(`Server is listening on 0.0.0.0:${PORT}`);
 });
