@@ -19,7 +19,7 @@ class OSRMService {
     }
 
     try {
-      const url = `${this.baseUrl}/${slng},${slat};${elng},${elat}?overview=full&geometries=geojson&steps=true&annotations=true`;
+      const url = `${this.baseUrl}/${slng},${slat};${elng},${elat}?overview=full&geometries=geojson&steps=true&annotations=true&alternatives=3`;
       const response = await axios.get(url, { timeout: 10000 });
       
       const routeData = response.data;
@@ -27,8 +27,8 @@ class OSRMService {
         throw new Error('No routes found');
       }
 
-      await cacheService.set(cacheKey, routeData.routes[0], 3600); // cache route mostly static, 1 hr
-      return routeData.routes[0];
+      await cacheService.set(cacheKey, routeData.routes, 3600); // cache array of routes
+      return routeData.routes;
     } catch (error) {
       console.error('OSRM fetch error:', error.message);
       throw error;

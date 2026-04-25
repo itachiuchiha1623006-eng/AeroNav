@@ -26,5 +26,5 @@ AeroNav is a pollution-aware navigation platform consisting of a Flutter-based m
 
 ## Important Notes for Agents
 - The backend relies on a physical network loopback config. When testing with physical devices, `navigation_service.dart`'s `_baseUrl` must explicitly point to the dev machine's active IP instance (e.g., `192.168.1.x:3000`), rather than `localhost`.
-- JSON keys exchanged between frontend and backend route APIs are: `totalDistanceKm`, `totalDurationMin`, `overallAqi`, `segments`. Avoid using typical raw OSRM syntax on the UI.
+- JSON keys exchanged between frontend and backend route APIs are nested inside a `routes` array. Each route contains `summary` (`totalDistanceKm`, `totalDurationMin`, `overallAqi`), `segments`, and boolean markers `isFastest`/`isCleanest`. avoids using typical raw OSRM syntax on the UI.
 - `PulsingLocationMarker` does not feature `heading` inputs. Rotation is directly controlled through the `MapController` from `flutter_map`.
