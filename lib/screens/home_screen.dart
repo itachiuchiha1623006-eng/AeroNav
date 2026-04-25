@@ -360,29 +360,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildSearchBar() {
     return Positioned(
-      top: 50,
+      top: 16,
       left: 16,
       right: 16,
       child: Column(
-        
         children: [
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Icon(Icons.search, color: Color(0xFF2DB87A)),
-                  SizedBox(width: 8),
-                  Text('AeroNav', style: TextStyle(color: Color(0xFF2DB87A), fontSize: 20, fontWeight: FontWeight.bold, fontStyle: FontStyle.italic)),
-                ],
-              ),
-              CircleAvatar(
-                radius: 16,
-                backgroundImage: NetworkImage('https://i.pravatar.cc/100'),
-              )
-            ],
-          ),
-          const SizedBox(height: 16),
           GestureDetector(
             onTap: _openSearch,
             child: Container(
@@ -396,9 +378,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.location_on, color: Color(0xFF2DB87A)),
+                  const Icon(Icons.search, color: Color(0xFF2DB87A)),
                   const SizedBox(width: 12),
-                  Text('Where do you want to go', style: TextStyle(color: Colors.grey[600], fontSize: 16)),
+                  Text('Where do you want to go ?', style: TextStyle(color: Colors.grey[600], fontSize: 16)),
                   const Spacer(),
                   const Icon(Icons.mic, color: Colors.grey),
                 ],
@@ -410,57 +392,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildExploreSheet() {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.55,
-      minChildSize: 0.1,
-      maxChildSize: 0.55,
-      builder: (context, scrollController) {
-        // StatefulBuilder ensures this subtree rebuilds when parent calls setState
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            return Container(
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-                boxShadow: [
-                  BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, -2))
-                ]
-              ),
-              child: ListView(
-                controller: scrollController,
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                children: [
-                  Center(
-                    child: Container(
-                      margin: const EdgeInsets.only(top: 12, bottom: 16),
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2)
-                      ),
-                    ),
-                  ),
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Explore nearby', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87)),
-                      Text('View all', style: TextStyle(color: Color(0xFF2DB87A), fontWeight: FontWeight.w600)),
-                    ],
-                  ),
 
-                  const SizedBox(height: 24),
-                  _buildAQICard(),
-                  const SizedBox(height: 100), // padding for bottom nav
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
 
   Widget _buildLocationCard(IconData icon, String title, String subtitle) {
     return GestureDetector(
@@ -928,7 +860,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        title: Image.asset(
+          'assets/images/logo.png',
+          height: 36,
+          fit: BoxFit.contain,
+        ),
+        actions: const [
+          CircleAvatar(
+            radius: 16,
+            backgroundImage: NetworkImage('https://i.pravatar.cc/100'),
+          ),
+          SizedBox(width: 16),
+        ],
+        backgroundColor: Colors.white,
+        elevation: 1,
+        shadowColor: Colors.black12,
+        surfaceTintColor: Colors.white,
+      ),
       body: Stack(
         children: [
           FlutterMap(
@@ -999,7 +948,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           
           if (_isExploring && _polylines.isNotEmpty) _buildAQILegend(),
           
-          if (_isExploring) _buildExploreSheet(),
+
 
           if (_isLoading)
             const Center(

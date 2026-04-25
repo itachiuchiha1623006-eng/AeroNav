@@ -524,40 +524,6 @@ class _RoutesScreenState extends State<RoutesScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Origin → Destination header
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Column(children: [
-                    const SizedBox(height: 4),
-                    const Icon(Icons.radio_button_checked, color: Colors.green, size: 16),
-                    Container(width: 2, height: 20, color: Colors.grey[300]),
-                    const Icon(Icons.location_on, color: Colors.red, size: 16),
-                  ]),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Current Location', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                        const Text('Your Location',
-                            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                        const SizedBox(height: 12),
-                        const Text('Destination', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                        Text(widget.destinationName,
-                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Divider(height: 1),
-              ),
 
               // Route cards
               ..._routes.asMap().entries.map((entry) {
