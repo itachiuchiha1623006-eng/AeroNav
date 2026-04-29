@@ -1081,7 +1081,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     _buildNavItem(0, Icons.explore, 'EXPLORE'),
-                   
+
                     _buildNavItem(3, Icons.person, 'PROFILE'),
                   ],
                 ),
@@ -1097,8 +1097,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return GestureDetector(
       onTap: () {
         if (index == 3) {
-          ref.read(authServiceProvider).signOut();
-          context.go('/auth/login');
+          context.push('/profile');
         } else {
           setState(() {
             _currentIndex = index;

@@ -23,63 +23,73 @@ class AQIService {
       return cachedData;
     }
 
-    try {
-      if (!this.apiKey || this.apiKey === 'your_datagov_api_key_here') {
-        console.warn('[AQI] No DATAGOVIN_API_KEY — falling back to mock stations.');
-        return this.getMockStations();
-      }
-
-      // Fetch all records — API has ~3400+ entries covering India
-      const url = `${this.baseUrl}?api-key=${this.apiKey}&format=json&limit=5000`;
-      const response = await axios.get(url, { timeout: 20000 });
-
-      const records = response.data.records || [];
-      console.log(`[AQI] data.gov.in returned ${records.length} raw records.`);
-
-      // Normalize pollutant_id strings to internal keys
-      const pollutantMap = {
-        'PM2.5': 'pm25', 'PM10': 'pm10',
-        'NO2':   'no2',  'SO2':  'so2',
-        'CO':    'co',   'O3':   'o3',   'OZONE': 'o3', 'NH3': 'nh3'
-      };
-
-      // Group records by station (keyed by rounded lat_lng)
-      const grouped = {};
-      for (const record of records) {
-        const lat = parseFloat(record.latitude);
-        const lng = parseFloat(record.longitude);
-
-        // Skip records with no valid GPS coordinates
-        if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) continue;
-
-        const avg = parseFloat(record.avg_value);
-        if (isNaN(avg) || avg < 0) continue; // skip missing / bad readings
-
-        const rawId = (record.pollutant_id || '').toUpperCase().trim();
-        const pollutant = pollutantMap[rawId] || rawId.toLowerCase();
-
-        const key = `${lat.toFixed(4)}_${lng.toFixed(4)}`;
-        if (!grouped[key]) {
-          grouped[key] = { lat, lng, pollutants: {} };
-        }
-        grouped[key].pollutants[pollutant] = avg;
-      }
-
-      const result = Object.values(grouped);
-      console.log(`[AQI] Parsed ${result.length} unique live CPCB stations.`);
-
-      if (result.length === 0) {
-        console.warn('[AQI] No valid stations parsed — falling back to mock data.');
-        return this.getMockStations();
-      }
-
-      await cacheService.set(cacheKey, result, 900); // 15-min cache
-      return result;
-
-    } catch (error) {
-      console.error('[AQI] Failed to fetch CPCB live data:', error.message, '— using mock stations.');
-      return this.getMockStations();
+    if (this._activeFetchPromise) {
+      return this._activeFetchPromise;
     }
+
+    this._activeFetchPromise = (async () => {
+      try {
+        if (!this.apiKey || this.apiKey === 'your_datagov_api_key_here') {
+          console.warn('[AQI] No DATAGOVIN_API_KEY — falling back to mock stations.');
+          return this.getMockStations();
+        }
+
+        // Fetch all records — API has ~3400+ entries covering India
+        const url = `${this.baseUrl}?api-key=${this.apiKey}&format=json&limit=5000`;
+        const response = await axios.get(url, { timeout: 20000 });
+
+        const records = response.data.records || [];
+        console.log(`[AQI] data.gov.in returned ${records.length} raw records.`);
+
+        // Normalize pollutant_id strings to internal keys
+        const pollutantMap = {
+          'PM2.5': 'pm25', 'PM10': 'pm10',
+          'NO2':   'no2',  'SO2':  'so2',
+          'CO':    'co',   'O3':   'o3',   'OZONE': 'o3', 'NH3': 'nh3'
+        };
+
+        // Group records by station (keyed by rounded lat_lng)
+        const grouped = {};
+        for (const record of records) {
+          const lat = parseFloat(record.latitude);
+          const lng = parseFloat(record.longitude);
+
+          // Skip records with no valid GPS coordinates
+          if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) continue;
+
+          const avg = parseFloat(record.avg_value);
+          if (isNaN(avg) || avg < 0) continue; // skip missing / bad readings
+
+          const rawId = (record.pollutant_id || '').toUpperCase().trim();
+          const pollutant = pollutantMap[rawId] || rawId.toLowerCase();
+
+          const key = `${lat.toFixed(4)}_${lng.toFixed(4)}`;
+          if (!grouped[key]) {
+            grouped[key] = { lat, lng, pollutants: {} };
+          }
+          grouped[key].pollutants[pollutant] = avg;
+        }
+
+        const result = Object.values(grouped);
+        console.log(`[AQI] Parsed ${result.length} unique live CPCB stations.`);
+
+        if (result.length === 0) {
+          console.warn('[AQI] No valid stations parsed — falling back to mock data.');
+          return this.getMockStations();
+        }
+
+        await cacheService.set(cacheKey, result, 900); // 15-min cache
+        return result;
+
+      } catch (error) {
+        console.error('[AQI] Failed to fetch CPCB live data:', error.message, '— using mock stations.');
+        return this.getMockStations();
+      } finally {
+        this._activeFetchPromise = null;
+      }
+    })();
+
+    return this._activeFetchPromise;
   }
 
   async fetchStationsForBoundingBox(swLat, swLng, neLat, neLng) {

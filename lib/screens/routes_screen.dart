@@ -9,6 +9,7 @@ import 'package:flutter_compass/flutter_compass.dart';
 
 import '../services/navigation_service.dart';
 import '../widgets/pulsing_location_marker.dart';
+import '../widgets/route_loading_overlay.dart';
 import '../models/route_step.dart';
 
 class RoutesScreen extends StatefulWidget {
@@ -324,26 +325,7 @@ class _RoutesScreenState extends State<RoutesScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
-        backgroundColor: Colors.white,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const CircularProgressIndicator(color: Color(0xFF2DB87A)),
-              const SizedBox(height: 24),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 40),
-                child: Text(
-                  _loadingMessage,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
+      return RouteLoadingOverlay(message: _loadingMessage);
     }
 
     // ── Error state ──────────────────────────────────────────────────────────
