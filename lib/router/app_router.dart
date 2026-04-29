@@ -1,6 +1,7 @@
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../screens/splash_screen.dart';
+import '../screens/landing_screen.dart';
 import '../screens/auth/login_screen.dart';
 import '../screens/auth/register_screen.dart';
 import '../screens/home_screen.dart';
@@ -15,15 +16,16 @@ final appRouter = GoRouter(
     final session = Supabase.instance.client.auth.currentSession;
     final isAuthenticated = session != null;
     final isSplash = state.matchedLocation == '/splash';
+    final isLanding = state.matchedLocation == '/landing';
     final isAuthRoute = state.matchedLocation.startsWith('/auth');
 
-    // Always allow splash
-    if (isSplash) return null;
+   
+    if (isSplash || isLanding) return null;
 
-    // Redirect to login if not authenticated and not on an auth route
+
     if (!isAuthenticated && !isAuthRoute) return '/auth/login';
 
-    // Redirect to home if authenticated and trying to access auth routes
+    
     if (isAuthenticated && isAuthRoute) return '/home';
 
     return null;
@@ -32,6 +34,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/splash',
       builder: (context, state) => const SplashScreen(),
+    ),
+    GoRoute(
+      path: '/landing',
+      builder: (context, state) => const LandingScreen(),
     ),
     GoRoute(
       path: '/auth/login',

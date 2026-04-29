@@ -1,14 +1,16 @@
 import 'package:dio/dio.dart';
+import '../config/app_config.dart';
 
 class NavigationService {
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 15),
-    receiveTimeout: const Duration(seconds: 60), // backend does AQI+weather in ~10-30s
+    receiveTimeout: const Duration(seconds: 60),
+    headers: {
+      'ngrok-skip-browser-warning': 'true',
+    },
   ));
-  // 10.0.2.2 = Android emulator loopback to host machine
-  // 192.168.1.43 = Physical device on the same WiFi as the dev machine
-  // For USB: run `adb reverse tcp:3000 tcp:3000` then use http://127.0.0.1:3000/api
-  final String _baseUrl = 'http://192.168.1.43:3000/api'; // ← physical device (LAN)
+
+  final String _baseUrl = AppConfig.backendUrl;
 
   Future<Map<String, dynamic>?> getPollutionRoute({
     required double startLat,
