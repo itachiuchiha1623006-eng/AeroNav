@@ -47,10 +47,13 @@ const processRoute = async (req, res, includeSteps = false) => {
         return closest;
       };
 
-      // 4. Process each segment
-      const processedSegments = await Promise.all(segments.map(async (segment) => {
-        // Fetch Pollutants at Segment Midpoint via IDW
-        const pollutants = await aqiService.calculatePollutantsForPoint(segment.midpoint.lat, segment.midpoint.lng);
+      // 4. Batch fetch Pollutants at Segment Midpoints via IDW
+      const segmentMidpoints = segments.map(seg => ({ lat: seg.midpoint.lat, lng: seg.midpoint.lng }));
+      const segmentPollutants = await aqiService.calculatePollutantsForPoints(segmentMidpoints);
+
+      // 5. Process each segment
+      const processedSegments = segments.map((segment, index) => {
+        const pollutants = segmentPollutants[index];
         
         // Calculate Base AQI
         const baseAqi = calculateBaseAQI(pollutants);
@@ -78,7 +81,7 @@ const processRoute = async (req, res, includeSteps = false) => {
           },
           weather
         };
-      }));
+      });
 
       // Overall route summary
       const maxAqiSegment = processedSegments.reduce((max, seg) => 

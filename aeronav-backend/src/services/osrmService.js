@@ -20,7 +20,7 @@ class OSRMService {
 
     try {
       const url = `${this.baseUrl}/${slng},${slat};${elng},${elat}?overview=full&geometries=geojson&steps=true&annotations=true&alternatives=3`;
-      const response = await axios.get(url, { timeout: 10000 });
+      const response = await axios.get(url, { timeout: 8000 });
       
       const routeData = response.data;
       if (!routeData.routes || routeData.routes.length === 0) {

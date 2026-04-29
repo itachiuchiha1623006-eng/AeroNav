@@ -1044,6 +1044,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                ),
              ),
              
+         
+          Positioned(
+            bottom: MediaQuery.of(context).padding.bottom + 100,
+            right: 16,
+            child: FloatingActionButton(
+              heroTag: 'focusLocationBtn',
+              backgroundColor: Colors.white,
+              elevation: 4,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              onPressed: () {
+                if (_userLocation != null) {
+                  _mapController.move(_userLocation!, 15.0);
+                } else {
+                  _mapController.move(_startPoint, 15.0);
+                }
+              },
+              child: const Icon(Icons.my_location, color: Color(0xFF2DB87A)),
+            ),
+          ),
+
           if (_isExploring)
             Align(
               alignment: Alignment.bottomCenter,
@@ -1061,8 +1081,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     _buildNavItem(0, Icons.explore, 'EXPLORE'),
-                    _buildNavItem(1, Icons.directions_walk, 'ROUTES'),
-                    _buildNavItem(2, Icons.bookmark, 'SAVED'),
+                   
                     _buildNavItem(3, Icons.person, 'PROFILE'),
                   ],
                 ),

@@ -2,8 +2,8 @@ import 'package:dio/dio.dart';
 
 class NavigationService {
   final Dio _dio = Dio(BaseOptions(
-    connectTimeout: const Duration(seconds: 30),
-    receiveTimeout: const Duration(seconds: 180), // OSRM public demo can be slow (up to 2min)
+    connectTimeout: const Duration(seconds: 15),
+    receiveTimeout: const Duration(seconds: 60), // backend does AQI+weather in ~10-30s
   ));
   // 10.0.2.2 = Android emulator loopback to host machine
   // 192.168.1.43 = Physical device on the same WiFi as the dev machine
@@ -16,19 +16,14 @@ class NavigationService {
     required double endLat,
     required double endLng,
   }) async {
-    try {
-      final response = await _dio.post('$_baseUrl/navigation/route', data: {
-        'start': {'lat': startLat, 'lng': startLng},
-        'end': {'lat': endLat, 'lng': endLng},
-      });
-
-      if (response.statusCode == 200) {
-        return response.data;
-      }
-      return null;
-    } catch (e) {
-      return null;
-    }
+    // Let all exceptions propagate so the caller can show a real error message
+    // instead of silently returning null and leaving the user on a loading spinner.
+    final response = await _dio.post('$_baseUrl/navigation/route', data: {
+      'start': {'lat': startLat, 'lng': startLng},
+      'end': {'lat': endLat, 'lng': endLng},
+    });
+    if (response.statusCode == 200) return response.data as Map<String, dynamic>;
+    throw Exception('Server returned status ${response.statusCode}');
   }
 
   Future<Map<String, dynamic>?> getNavigationSteps({
@@ -42,12 +37,10 @@ class NavigationService {
         'start': {'lat': startLat, 'lng': startLng},
         'end': {'lat': endLat, 'lng': endLng},
       });
-
-      if (response.statusCode == 200) {
-        return response.data;
-      }
+      if (response.statusCode == 200) return response.data as Map<String, dynamic>;
       return null;
-    } catch (e) {
+    } catch (_) {
+      // Steps are non-fatal — navigation still works without turn-by-turn
       return null;
     }
   }

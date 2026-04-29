@@ -23,7 +23,7 @@ class WeatherService {
       }
 
       const url = `${this.baseUrl}?lat=${lat}&lon=${lng}&appid=${this.apiKey}&units=metric`;
-      const response = await axios.get(url, { timeout: 4000 });
+      const response = await axios.get(url, { timeout: 3000 });
       const data = response.data;
 
       const weather = {

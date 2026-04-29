@@ -33,6 +33,7 @@ class _RoutesScreenState extends State<RoutesScreen> {
 
   bool _isLoading = true;
   String _loadingMessage = 'Calculating pollution-aware routes...';
+  String? _errorMessage;
 
   // Multi-route state
   List<Map<String, dynamic>> _routes = [];
@@ -132,15 +133,10 @@ class _RoutesScreenState extends State<RoutesScreen> {
         endLng: widget.endPoint.longitude,
       );
 
-      if (routeData == null) {
-        _handleError('No response from server. Check your connection.');
-        return;
-      }
-
       // Safely extract the routes array
-      final rawRoutes = routeData['routes'];
+      final rawRoutes = routeData?['routes'];
       if (rawRoutes == null || rawRoutes is! List || rawRoutes.isEmpty) {
-        _handleError('Server returned no routes.');
+        _handleError('Server returned no routes. Try again.');
         return;
       }
 
@@ -171,8 +167,12 @@ class _RoutesScreenState extends State<RoutesScreen> {
       });
 
       _fitCameraToRoutes();
+    } on Exception catch (e) {
+      // Surface the real error (timeout, no network, server error, etc.)
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      _handleError('Could not load route: $msg');
     } catch (e) {
-      _handleError('Error calculating routes: $e');
+      _handleError('Unexpected error: $e');
     }
   }
 
@@ -205,9 +205,10 @@ class _RoutesScreenState extends State<RoutesScreen> {
 
   void _handleError(String message) {
     if (!mounted) return;
-    setState(() => _isLoading = false);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-    context.pop();
+    setState(() {
+      _isLoading = false;
+      _errorMessage = message;
+    });
   }
 
   // ─── Navigation Start ─────────────────────────────────────────────────────
@@ -340,6 +341,61 @@ class _RoutesScreenState extends State<RoutesScreen> {
                 ),
               ),
             ],
+          ),
+        ),
+      );
+    }
+
+    // ── Error state ──────────────────────────────────────────────────────────
+    if (_errorMessage != null) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                  const SizedBox(height: 20),
+                  const Text(
+                    'Route Unavailable',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _errorMessage!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14, color: Colors.black54),
+                  ),
+                  const SizedBox(height: 32),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _isLoading = true;
+                        _errorMessage = null;
+                        _loadingMessage = 'Calculating pollution-aware routes...';
+                      });
+                      _initializeRoutes();
+                    },
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Retry'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2DB87A),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: () => context.pop(),
+                    child: const Text('Go Back'),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       );
