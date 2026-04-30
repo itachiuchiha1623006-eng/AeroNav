@@ -633,6 +633,22 @@ class _RoutesScreenState extends State<RoutesScreen> {
                             const SizedBox(height: 3),
                             Text('${distKm.toStringAsFixed(1)} km',
                                 style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+                            if (summary['weather'] != null) ...[
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Icon(Icons.water_drop, size: 12, color: Colors.blue[400]),
+                                  const SizedBox(width: 2),
+                                  Text('${summary['weather']['humidity']}%',
+                                      style: TextStyle(fontSize: 11, color: Colors.grey[700])),
+                                  const SizedBox(width: 8),
+                                  Icon(Icons.air, size: 12, color: Colors.grey[500]),
+                                  const SizedBox(width: 2),
+                                  Text('${summary['weather']['windSpeed']} km/h',
+                                      style: TextStyle(fontSize: 11, color: Colors.grey[700])),
+                                ],
+                              ),
+                            ],
                           ],
                         ),
                         // Duration + AQI badge

@@ -3,6 +3,7 @@ const router = express.Router();
 const osrmService = require('../services/osrmService');
 const aqiService = require('../services/aqiService');
 const weatherService = require('../services/weatherService');
+const cacheService = require('../services/cacheService');
 const { calculateBaseAQI, calculateWeatherModifiers } = require('../services/scoreEngine');
 const { getCategoryAndColor } = require('../services/colorMapper');
 const { splitRouteIntoSegments } = require('../utils/geoUtils');
@@ -16,7 +17,12 @@ const processRoute = async (req, res, includeSteps = false) => {
       return res.status(400).json({ error: 'Valid start and end coordinates are required.' });
     }
 
-    // 1. Get OSRM routes (now returns an array)
+    const cacheKey = `full_route_${Math.round(start.lat * 10000) / 10000}_${Math.round(start.lng * 10000) / 10000}_${Math.round(end.lat * 10000) / 10000}_${Math.round(end.lng * 10000) / 10000}_${includeSteps}`;
+    const cachedResponse = await cacheService.get(cacheKey);
+    if (cachedResponse) {
+      return res.json(cachedResponse);
+    }
+
     const routes = await osrmService.getRoute(start, end);
     
     // Process each alternative route
@@ -31,7 +37,7 @@ const processRoute = async (req, res, includeSteps = false) => {
       const sampledCoords = sampleRoutePoints(coordinates, numWeatherSamples);
       const weatherSamples = await weatherService.getWeatherForMultiplePoints(sampledCoords);
 
-      // Helper to find closest weather sample
+      // closest weather sample
       const getClosestWeather = (lat, lng) => {
         if (!weatherSamples || weatherSamples.length === 0) return null;
         let closest = weatherSamples[0];
@@ -94,6 +100,24 @@ const processRoute = async (req, res, includeSteps = false) => {
       const overallAqiRounded = Math.round(avgAqi);
       const overallCategoryAndColor = getCategoryAndColor(overallAqiRounded);
 
+      let avgWindSpeed = 0, avgHumidity = 0, avgRainfall = 0;
+      if (processedSegments.length > 0) {
+        let count = 0;
+        processedSegments.forEach(seg => {
+           if (seg.weather) {
+               avgWindSpeed += seg.weather.windSpeed || 0;
+               avgHumidity += seg.weather.humidity || 0;
+               avgRainfall += seg.weather.rainfall || 0;
+               count++;
+           }
+        });
+        if (count > 0) {
+           avgWindSpeed /= count;
+           avgHumidity /= count;
+           avgRainfall /= count;
+        }
+      }
+
       const routeJSON = {
         summary: {
           totalDistanceKm: Number((route.distance / 1000).toFixed(2)),
@@ -101,7 +125,12 @@ const processRoute = async (req, res, includeSteps = false) => {
           overallAqi: overallAqiRounded,
           maxAqi: maxAqiSegment ? maxAqiSegment.aqi.final : 0,
           overallCategory: overallCategoryAndColor.category,
-          overallColor: overallCategoryAndColor.color
+          overallColor: overallCategoryAndColor.color,
+          weather: {
+             windSpeed: Number(avgWindSpeed.toFixed(1)),
+             humidity: Math.round(avgHumidity),
+             rainfall: Number(avgRainfall.toFixed(1))
+          }
         },
         segments: processedSegments
       };
@@ -141,6 +170,8 @@ const processRoute = async (req, res, includeSteps = false) => {
     const responseJSON = {
       routes: processedRoutes
     };
+
+    await cacheService.set(cacheKey, responseJSON, 300); // Cache for 5 mins
 
     res.json(responseJSON);
 

@@ -75,15 +75,7 @@ class _SearchScreenState extends State<SearchScreen> {
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: Colors.grey[300]!)
             ),
-            child: Row(
-              children: [
-                Icon(Icons.person, color: Colors.grey[600], size: 18),
-                const SizedBox(width: 8),
-                const Text("Myself", style: TextStyle(color: Colors.black87, fontSize: 13, fontWeight: FontWeight.w500)),
-                const SizedBox(width: 4),
-                Icon(Icons.keyboard_arrow_down, color: Colors.grey[600], size: 18)
-              ],
-            ),
+
           )
         ],
       ),

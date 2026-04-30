@@ -78,14 +78,7 @@ class _RouteLoadingOverlayState extends State<RouteLoadingOverlay>
               color: Color(0xFF1A7A4A),
             ),
           ),
-          InkWell(
-            onTap: () => context.push('/profile'),
-            child: CircleAvatar(
-              backgroundColor: Colors.white.withOpacity(0.5),
-              radius: 20,
-              child: const Icon(Icons.person_outline, color: Color(0xFF1A7A4A)),
-            ),
-          )
+
         ],
       ),
     );

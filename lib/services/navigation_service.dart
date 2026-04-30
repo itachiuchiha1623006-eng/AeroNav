@@ -18,8 +18,7 @@ class NavigationService {
     required double endLat,
     required double endLng,
   }) async {
-    // Let all exceptions propagate so the caller can show a real error message
-    // instead of silently returning null and leaving the user on a loading spinner.
+
     final response = await _dio.post('$_baseUrl/navigation/route', data: {
       'start': {'lat': startLat, 'lng': startLng},
       'end': {'lat': endLat, 'lng': endLng},

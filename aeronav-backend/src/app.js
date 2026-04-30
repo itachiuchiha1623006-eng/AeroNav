@@ -21,8 +21,8 @@ app.use(express.json());
 app.use(pinoHttp({ logger }));
 
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
+  windowMs: 15 * 60 * 1000,
+  max: 100,
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -41,7 +41,7 @@ app.get('/health', (req, res) => {
 app.use('/api/navigation', navigationRoutes);
 app.use('/api/aqi', aqiRoutes);
 
-// Catch-all error handler
+
 app.use((err, req, res, next) => {
   logger.error(err.stack);
   res.status(500).json({ error: 'Internal Server Error', details: err.message });

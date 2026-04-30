@@ -32,7 +32,7 @@ function splitRouteIntoSegments(coordinates, targetLengthKm = 1.0) {
     startPoint: { lng: coordinates[0][0], lat: coordinates[0][1] },
     endPoint: null,
     distanceKm: 0,
-    coordinates: [coordinates[0]] // Store coords to rebuild geometry if needed
+    coordinates: [coordinates[0]]
   };
 
   let accumulatedDist = 0;

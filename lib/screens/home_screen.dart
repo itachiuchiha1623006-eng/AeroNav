@@ -12,6 +12,8 @@ import '../services/auth_service.dart';
 import '../services/navigation_service.dart';
 import '../widgets/pulsing_location_marker.dart';
 import '../models/route_step.dart';
+import '../providers/profile_provider.dart';
+import 'dart:io';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -859,6 +861,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final _imagePath = ref.watch(profileImageProvider);
+
     return Scaffold(
       appBar: AppBar(
         title: Image.asset(
@@ -866,12 +870,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           height: 36,
           fit: BoxFit.contain,
         ),
-        actions: const [
+        actions: [
           CircleAvatar(
             radius: 16,
-            backgroundImage: NetworkImage('https://i.pravatar.cc/100'),
+            backgroundImage: _imagePath != null 
+                ? FileImage(File(_imagePath)) as ImageProvider
+                : const NetworkImage('https://i.pravatar.cc/100'),
           ),
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
         ],
         backgroundColor: Colors.white,
         elevation: 1,

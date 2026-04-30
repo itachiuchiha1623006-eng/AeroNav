@@ -17,7 +17,7 @@ class WeatherService {
 
     try {
       if (!this.apiKey || this.apiKey === 'your_openweathermap_api_key_here') {
-        // Mock data for development
+    
         console.warn('Using mock weather data. Provide OPENWEATHERMAP_API_KEY for real data.');
         return { windSpeed: 12, rainfall: 0, humidity: 60 };
       }
@@ -28,17 +28,17 @@ class WeatherService {
 
       const weather = {
         lat, lng,
-        windSpeed: data.wind ? data.wind.speed * 3.6 : 0, // convert m/s to km/h
+        windSpeed: data.wind ? data.wind.speed * 3.6 : 0, 
         rainfall: data.rain ? (data.rain['1h'] || 0) : 0,
         humidity: data.main ? data.main.humidity : 50,
       };
 
-      // Cache weather data for 30 minutes
+     
       await cacheService.set(cacheKey, weather, 1800);
       return weather;
     } catch (error) {
       console.error(`Error fetching weather for ${lat},${lng}:`, error.message);
-      // Failover default weather
+   
       return { lat, lng, windSpeed: 5, rainfall: 0, humidity: 50 }; 
     }
   }

@@ -1,5 +1,4 @@
-// Samples N evenly-spaced points along a GeoJSON LineString (array of [lng, lat])
-// Using Haversine formula to find total distance, and sample along that distance
+
 function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
   var R = 6371; // Radius of the earth in km
   var dLat = deg2rad(lat2 - lat1);

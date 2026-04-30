@@ -516,7 +516,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
   }
 }
 
-// Reused input field widget
+
 class _InputField extends StatelessWidget {
   final TextEditingController controller;
   final String label;
